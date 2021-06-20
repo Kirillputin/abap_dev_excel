@@ -1,0 +1,499 @@
+*&---------------------------------------------------------------------*
+*& Report Z_EXAMPLE_EXCEL
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT z_example_excel.
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+PARAMETERS:
+  p_wb    RADIOBUTTON GROUP gr1,
+  p_xslt  RADIOBUTTON GROUP gr1  DEFAULT 'X',
+  p_2xlsx RADIOBUTTON GROUP gr1,
+  p_zwww  RADIOBUTTON GROUP gr1,
+  p_times TYPE numc10 DEFAULT 10.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+**************** ZWWW ***********
+CLASS lcl_zwww DEFINITION.
+  PUBLIC SECTION.
+    DATA:
+      mt_context TYPE flighttab.
+
+    METHODS:
+      zwww_start.
+  PRIVATE SECTION.
+    METHODS:
+      get_data,
+      call_zwww.
+
+ENDCLASS.
+CLASS lcl_zwww IMPLEMENTATION.
+  METHOD zwww_start.
+    get_data( ).
+    call_zwww( ).
+  ENDMETHOD.
+  METHOD get_data.
+
+    SELECT *
+      FROM sflight
+      UP TO 1 ROWS
+      INTO TABLE @DATA(lt_sflight).
+
+    DO p_times TIMES.                                       "100000
+      APPEND LINES OF lt_sflight TO mt_context.
+    ENDDO.
+
+  ENDMETHOD.
+  METHOD call_zwww.
+    DATA lt_values TYPE zwww_values_t.
+
+    GET TIME STAMP FIELD DATA(lv_time_run).
+
+    LOOP AT mt_context ASSIGNING FIELD-SYMBOL(<ls_context>).
+      DATA(lt_tabix) = sy-tabix.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_1]' value = <ls_context>-carrid ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_2]' value = <ls_context>-connid ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_3]' value = <ls_context>-fldate ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_4]' value = <ls_context>-price ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_5]' value = <ls_context>-currency ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_6]' value = <ls_context>-planetype ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_7]' value = <ls_context>-seatsmax ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_8]' value = <ls_context>-seatsocc ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_9]' value = <ls_context>-paymentsum ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_10]' value = <ls_context>-seatsmax_b ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_11]' value = <ls_context>-seatsocc_b ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_12]' value = <ls_context>-seatsmax_b ) TO lt_values.
+      APPEND VALUE #( var_name = 'TABLE' var_num = lt_tabix find_text = '[P_13]' value = <ls_context>-seatsmax_f ) TO lt_values.
+    ENDLOOP.
+
+    CALL FUNCTION 'ZWWW_OPENFORM'
+      EXPORTING
+        form_name   = 'ZWWW_EXAMPLE'
+      TABLES
+        it_values   = lt_values
+      EXCEPTIONS
+        printcancel = 1
+        OTHERS      = 2.
+
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+
+    GET TIME STAMP FIELD DATA(lv_time_fin).
+    DATA lv_time TYPE i.
+    DATA: lv_time_conv TYPE t.
+
+    CALL FUNCTION 'CCU_TIMESTAMP_DIFFERENCE'
+      EXPORTING
+        timestamp1 = CONV tzntimestp( lv_time_fin )
+        timestamp2 = CONV tzntimestp( lv_time_run )
+      IMPORTING
+        difference = lv_time.
+
+    lv_time_conv = lv_time.
+
+    WRITE: / 'ZWWW',
+           / 'Начало:',  lv_time_run TIME ZONE sy-zonlo,
+           / 'Конец:', lv_time_fin TIME ZONE sy-zonlo,
+           / 'Время:', (10) lv_time_conv USING EDIT MASK '__:__:__' .
+
+  ENDMETHOD.
+ENDCLASS.
+
+**************** WorkBanch ***********
+CLASS lcl_wb DEFINITION.
+  PUBLIC SECTION.
+    DATA:
+      mt_context TYPE flighttab.
+
+    METHODS:
+      wb_start.
+  PRIVATE SECTION.
+    METHODS:
+      get_data,
+      call_wb.
+
+ENDCLASS.
+CLASS lcl_wb IMPLEMENTATION.
+  METHOD wb_start.
+    get_data( ).
+    call_wb( ).
+  ENDMETHOD.
+  METHOD get_data.
+
+    SELECT *
+      FROM sflight
+      UP TO 1 ROWS
+      INTO TABLE @DATA(lt_sflight).
+
+    DO p_times TIMES.                                       "100000
+      APPEND LINES OF lt_sflight TO mt_context.
+    ENDDO.
+
+  ENDMETHOD.
+  METHOD call_wb.
+
+    GET TIME STAMP FIELD DATA(lv_time_run).
+
+    CALL FUNCTION 'ZXLWB_CALLFORM'
+      EXPORTING
+        iv_formname        = 'Y00_TMP_EMPTY'
+        iv_context_ref     = mt_context
+        iv_viewer_inplace  = abap_false
+      EXCEPTIONS
+        process_terminated = 1
+        OTHERS             = 2.
+
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+
+    GET TIME STAMP FIELD DATA(lv_time_fin).
+    DATA lv_time TYPE i.
+    DATA: lv_time_conv TYPE t.
+
+    CALL FUNCTION 'CCU_TIMESTAMP_DIFFERENCE'
+      EXPORTING
+        timestamp1 = CONV tzntimestp( lv_time_fin )
+        timestamp2 = CONV tzntimestp( lv_time_run )
+      IMPORTING
+        difference = lv_time.
+
+    lv_time_conv = lv_time.
+
+    WRITE: / 'Workbench',
+           / 'Начало:',  lv_time_run TIME ZONE sy-zonlo,
+           / 'Конец:', lv_time_fin TIME ZONE sy-zonlo,
+           / 'Время:', (10) lv_time_conv USING EDIT MASK '__:__:__' .
+
+  ENDMETHOD.
+ENDCLASS.
+
+
+****** ZXSLT_TRANSFORMATION *****************
+CLASS lcl_xslt DEFINITION.
+  PUBLIC SECTION.
+
+    METHODS:
+      xslt_start.
+
+  PRIVATE SECTION.
+    DATA:
+      mt_context TYPE flighttab.
+
+    METHODS:
+      get_data,
+      call_xslt.
+ENDCLASS.
+CLASS lcl_xslt IMPLEMENTATION.
+  METHOD xslt_start.
+    get_data( ).
+    call_xslt( ).
+  ENDMETHOD.
+  METHOD call_xslt.
+
+    DATA:
+      lo_ostream  TYPE REF TO if_ixml_ostream,
+      lv          TYPE string,
+      lt_data_xml TYPE swxmlcont.
+
+    GET TIME STAMP FIELD DATA(lv_time_run).
+
+    DATA(lo_xml) = cl_ixml=>create( ).
+    DATA(lo_stream_factory) = lo_xml->create_stream_factory( ).
+    lo_ostream = lo_stream_factory->create_ostream_itable( table = lt_data_xml ).
+
+    CALL TRANSFORMATION zch_test_itab
+      SOURCE
+        tab1 = mt_context
+      RESULT XML
+        lo_ostream.
+
+    DATA workdir  TYPE string.
+    cl_gui_frontend_services=>get_sapgui_workdir( CHANGING sapworkdir = workdir ).
+
+    cl_gui_cfw=>flush( ).
+    CONCATENATE workdir '\' 'ZXSLT_TRANSFORMATION' sy-datum sy-uzeit '.xml' INTO DATA(filename).
+*  "remove special characters
+    REPLACE ALL OCCURRENCES OF '*' IN filename WITH space.
+
+    CALL METHOD cl_gui_frontend_services=>gui_download
+      EXPORTING
+        filename         = filename
+        filetype         = 'BIN'
+      CHANGING
+        data_tab         = lt_data_xml[]
+      EXCEPTIONS
+        file_write_error = 1
+        OTHERS           = 99.
+
+    CONCATENATE '"' filename '"' INTO filename.
+
+    CALL METHOD cl_gui_frontend_services=>execute
+      EXPORTING
+        application = 'Excel'
+        parameter   = filename
+        operation   = 'OPEN'
+      EXCEPTIONS
+        OTHERS      = 1.
+
+    GET TIME STAMP FIELD DATA(lv_time_fin).
+    DATA lv_time TYPE i.
+    DATA: lv_time_conv TYPE t.
+
+    CALL FUNCTION 'CCU_TIMESTAMP_DIFFERENCE'
+      EXPORTING
+        timestamp1 = CONV tzntimestp( lv_time_fin )
+        timestamp2 = CONV tzntimestp( lv_time_run )
+      IMPORTING
+        difference = lv_time.
+
+    lv_time_conv = lv_time.
+
+    WRITE: / 'ZXSLT TRANSFORMATION',
+           / 'Начало:',  lv_time_run TIME ZONE sy-zonlo,
+           / 'Конец:', lv_time_fin TIME ZONE sy-zonlo,
+           / 'Время:', (10) lv_time_conv USING EDIT MASK '__:__:__' .
+
+  ENDMETHOD.
+  METHOD get_data.
+
+    SELECT *
+      FROM sflight
+      UP TO 1 ROWS
+      INTO TABLE @DATA(lt_sflight).
+
+    DO p_times TIMES.                                       "100000
+      APPEND LINES OF lt_sflight TO mt_context.
+    ENDDO.
+
+  ENDMETHOD.
+ENDCLASS.
+
+************* ABAP2XLSX ******************
+CLASS lcl_abap2xlsx DEFINITION.
+  PUBLIC SECTION.
+    CLASS-METHODS:
+      output         IMPORTING cl_excel            TYPE REF TO zcl_excel
+                               iv_writerclass_name TYPE clike OPTIONAL.
+
+    DATA: mt_context TYPE flighttab.
+    METHODS:
+      start.
+  PRIVATE SECTION.
+    METHODS:
+      get_data,
+      call_abap2xlsx,
+      download_frontend.
+    DATA: lv_xdata     TYPE xstring,             " Will be used for sending as email
+          lt_rawdata   TYPE solix_tab,           " Will be used for downloading or open directly
+          lv_bytecount TYPE i.                   " Will be used for downloading or open directly
+ENDCLASS.
+
+CLASS lcl_abap2xlsx IMPLEMENTATION.
+  METHOD start.
+    get_data( ).
+    call_abap2xlsx( ).
+  ENDMETHOD.
+
+  METHOD get_data.
+    SELECT *
+      FROM sflight
+      UP TO 1 ROWS
+      INTO TABLE @DATA(lt_sflight).
+
+    DO p_times TIMES.                                       "100000
+      APPEND LINES OF lt_sflight TO mt_context.
+    ENDDO.
+  ENDMETHOD.
+
+  METHOD call_abap2xlsx.
+    DATA: lo_excel            TYPE REF TO zcl_excel,
+          lo_worksheet        TYPE REF TO zcl_excel_worksheet,
+          lo_column_dimension TYPE REF TO zcl_excel_worksheet_columndime,
+          lv_row              TYPE i VALUE 3,
+          lv_row_start        TYPE i VALUE 3,
+          lt_text_tab         TYPE TABLE OF dfies,
+          lv_tab_name         TYPE ddobjname VALUE 'SFLIGHT',
+          lv_alphabet         TYPE char27 VALUE 'AABCDEFGHIJKLMNOPQRSTUVWXYZ',
+          lv_letter           TYPE c,
+          lv_position         TYPE i.
+
+    GET TIME STAMP FIELD DATA(lv_time_run).
+
+    CREATE OBJECT lo_excel.
+
+    lo_worksheet = lo_excel->get_active_worksheet( ).
+    TRY.
+        lo_worksheet->set_title( ip_title = 'Рейсы'(000) ).
+      CATCH zcx_excel.
+        RETURN.
+    ENDTRY.
+
+    CALL FUNCTION 'DDIF_FIELDINFO_GET'
+      EXPORTING
+        tabname   = lv_tab_name
+        langu     = sy-langu
+      TABLES
+        dfies_tab = lt_text_tab.
+
+    LOOP AT lt_text_tab ASSIGNING FIELD-SYMBOL(<fs_text_tab>).
+      lv_position = lv_position + 1.
+      IF lv_position = 1.
+        CONTINUE.
+      ENDIF.
+
+      lv_letter = lv_alphabet+lv_position(1).
+
+      TRY.
+          lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row_start ip_value = <fs_text_tab>-fieldtext ).
+          lo_worksheet->change_cell_style( ip_column = lv_letter ip_row = 3 ip_font_bold = abap_true ).
+          lo_column_dimension = lo_worksheet->get_column_dimension( ip_column = lv_letter ).
+          lo_column_dimension->set_auto_size( ip_auto_size = abap_true ).
+        CATCH zcx_excel.
+          RETURN.
+      ENDTRY.
+
+      lv_row = lv_row_start.
+      LOOP AT mt_context ASSIGNING FIELD-SYMBOL(<fs_context>).
+        lv_row = lv_row + 1.
+        TRY.
+            CASE <fs_text_tab>-fieldname.
+              WHEN 'CARRID'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-carrid ).
+              WHEN 'CONNID'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-connid ).
+              WHEN 'FLDATE'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-fldate ).
+              WHEN 'PRICE'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-price ).
+              WHEN 'CURRENCY'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-currency ).
+              WHEN 'PLANETYPE'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-planetype ).
+              WHEN 'SEATSMAX'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-seatsmax ).
+              WHEN 'SEATSOCC'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-seatsocc ).
+              WHEN 'PAYMENTSUM'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-paymentsum ).
+              WHEN 'SEATSMAX_B'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-seatsmax_b ).
+              WHEN 'SEATSOCC_B'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-seatsocc_b ).
+              WHEN 'SEATSMAX_F'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-seatsmax_f ).
+              WHEN 'SEATSOCC_F'.
+                lo_worksheet->set_cell( ip_column = lv_letter ip_row = lv_row ip_value = <fs_context>-seatsocc_f ).
+            ENDCASE.
+          CATCH zcx_excel.
+            CONTINUE.
+        ENDTRY.
+
+      ENDLOOP.
+    ENDLOOP.
+
+    lcl_abap2xlsx=>output( lo_excel ).
+
+    GET TIME STAMP FIELD DATA(lv_time_fin).
+    DATA lv_time TYPE i.
+    DATA: lv_time_conv TYPE t.
+
+    CALL FUNCTION 'CCU_TIMESTAMP_DIFFERENCE'
+      EXPORTING
+        timestamp1 = CONV tzntimestp( lv_time_fin )
+        timestamp2 = CONV tzntimestp( lv_time_run )
+      IMPORTING
+        difference = lv_time.
+
+    lv_time_conv = lv_time.
+
+    WRITE: / 'Abap2xlsx',
+           / 'Начало:',  lv_time_run TIME ZONE sy-zonlo,
+           / 'Конец:', lv_time_fin TIME ZONE sy-zonlo,
+           / 'Время:', (10) lv_time_conv USING EDIT MASK '__:__:__' .
+
+  ENDMETHOD.
+
+  METHOD output.
+    DATA: cl_output TYPE REF TO lcl_abap2xlsx,
+          cl_writer TYPE REF TO zif_excel_writer.
+
+    IF iv_writerclass_name IS INITIAL.
+      CREATE OBJECT cl_output.
+      CREATE OBJECT cl_writer TYPE zcl_excel_writer_2007.
+    ELSE.
+      CREATE OBJECT cl_output.
+      CREATE OBJECT cl_writer TYPE (iv_writerclass_name).
+    ENDIF.
+    cl_output->lv_xdata = cl_writer->write_file( cl_excel ).
+
+    cl_output->lt_rawdata = cl_bcs_convert=>xstring_to_solix( iv_xstring  = cl_output->lv_xdata ).
+    cl_output->lv_bytecount = xstrlen( cl_output->lv_xdata ).
+
+    cl_output->download_frontend( ).
+  ENDMETHOD.
+
+  METHOD download_frontend.
+    DATA: lv_filename TYPE string,
+          lv_tempdir  TYPE string.
+
+    CALL METHOD cl_gui_frontend_services=>get_temp_directory
+      CHANGING
+        temp_dir             = lv_tempdir
+      EXCEPTIONS
+        cntl_error           = 1
+        error_no_gui         = 2
+        not_supported_by_gui = 3
+        OTHERS               = 4.
+    IF sy-subrc <> 0.
+*      MESSAGE ID 'ZHR0225' TYPE 'E' NUMBER 007.
+    ENDIF.
+
+    CALL METHOD cl_gui_cfw=>flush( ).
+
+    lv_filename = |{ lv_tempdir }\\{ sy-datum }_ABAP2XLSX_{ sy-timlo }.xlsx|.
+
+    cl_gui_frontend_services=>gui_download( EXPORTING bin_filesize = lv_bytecount
+                                                      filename     = lv_filename
+                                                      filetype     = 'BIN'
+                                             CHANGING data_tab     = lt_rawdata ).
+    cl_gui_frontend_services=>execute(
+      EXPORTING
+        document               = lv_filename
+      EXCEPTIONS
+        cntl_error             = 1
+        error_no_gui           = 2
+        bad_parameter          = 3
+        file_not_found         = 4
+        path_not_found         = 5
+        file_extension_unknown = 6
+        error_execute_failed   = 7
+        synchronous_failed     = 8
+        not_supported_by_gui   = 9
+      ).
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+  ENDMETHOD.
+ENDCLASS.
+
+
+************************
+START-OF-SELECTION.
+
+  IF p_wb = abap_true.
+    DATA(go_wb) = NEW lcl_wb( ).
+    go_wb->wb_start( ).
+  ELSEIF p_xslt = abap_true.
+    DATA(go_xslt) = NEW lcl_xslt( ).
+    go_xslt->xslt_start( ).
+  ELSEIF p_2xlsx = abap_true.
+    DATA(go_abap2xlsx) = NEW lcl_abap2xlsx( ).
+    go_abap2xlsx->start( ).
+  ELSEIF p_zwww = abap_true.
+    DATA(go_zwww) = NEW lcl_zwww( ).
+    go_zwww->zwww_start( ).
+  ENDIF.
